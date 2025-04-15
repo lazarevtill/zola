@@ -2,9 +2,10 @@
 
 import { ChatInput } from "@/app/components/chat-input/chat-input"
 import { Conversation } from "@/app/components/chat/conversation"
+import { useChatSession } from "@/app/providers/chat-session-provider"
 import { useUser } from "@/app/providers/user-provider"
 import { toast } from "@/components/ui/toast"
-import { checkRateLimits, createGuestUser } from "@/lib/api"
+import { checkRateLimits, getOrCreateGuestUserId } from "@/lib/api"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useMessages } from "@/lib/chat-store/messages/provider"
 import {
@@ -23,8 +24,8 @@ import { cn } from "@/lib/utils"
 import { useChat } from "@ai-sdk/react"
 import { AnimatePresence, motion } from "motion/react"
 import dynamic from "next/dynamic"
-import { redirect } from "next/navigation"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { redirect, useRouter, useSearchParams } from "next/navigation"
+import { useCallback, useEffect, useState } from "react"
 
 const FeedbackWidget = dynamic(
   () => import("./feedback-widget").then((mod) => mod.FeedbackWidget),
@@ -36,18 +37,19 @@ const DialogAuth = dynamic(
   { ssr: false }
 )
 
-type ChatProps = {
-  chatId?: string
-}
-
-export default function Chat({ chatId: propChatId }: ChatProps) {
-  const { createNewChat, getChatById, updateChatModel } = useChats()
-  const currentChat = propChatId ? getChatById(propChatId) : null
+export function Chat() {
+  const { chatId } = useChatSession()
+  const {
+    createNewChat,
+    getChatById,
+    updateChatModel,
+    isLoading: isChatsLoading,
+  } = useChats()
+  const currentChat = chatId ? getChatById(chatId) : null
   const { messages: initialMessages, cacheAndAddMessage } = useMessages()
   const { user } = useUser()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [hasDialogAuth, setHasDialogAuth] = useState(false)
-  const [chatId, setChatId] = useState<string | null>(propChatId || null)
   const [files, setFiles] = useState<File[]>([])
   const [selectedModel, setSelectedModel] = useState(
     currentChat?.model || user?.preferred_model || MODEL_DEFAULT
@@ -55,6 +57,12 @@ export default function Chat({ chatId: propChatId }: ChatProps) {
   const [systemPrompt, setSystemPrompt] = useState(
     currentChat?.system_prompt || SYSTEM_PROMPT_DEFAULT
   )
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(
+    currentChat?.agent_id || null
+  )
+  const [hydrated, setHydrated] = useState(false)
+  const searchParams = useSearchParams()
+  const router = useRouter()
 
   const isAuthenticated = !!user?.id
   const {
@@ -78,9 +86,22 @@ export default function Chat({ chatId: propChatId }: ChatProps) {
     },
   })
 
-  const isFirstMessage = useMemo(() => {
-    return messages.length === 0
-  }, [messages])
+  // when chatId is null, set messages to an empty array
+  useEffect(() => {
+    if (chatId === null) {
+      setMessages([])
+    }
+  }, [chatId])
+
+  useEffect(() => {
+    if (currentChat?.system_prompt) {
+      setSystemPrompt(currentChat?.system_prompt)
+    }
+  }, [currentChat])
+
+  useEffect(() => {
+    setHydrated(true)
+  }, [])
 
   useEffect(() => {
     if (error) {
@@ -98,16 +119,44 @@ export default function Chat({ chatId: propChatId }: ChatProps) {
     }
   }, [error])
 
-  const getOrCreateGuestUserId = async (): Promise<string | null> => {
-    if (user?.id) return user.id
+  useEffect(() => {
+    const prompt = searchParams.get("prompt")
 
-    const stored = localStorage.getItem("guestId")
-    if (stored) return stored
+    if (!prompt || !chatId || messages.length > 0) return
 
-    const guestId = crypto.randomUUID()
-    localStorage.setItem("guestId", guestId)
-    await createGuestUser(guestId)
-    return guestId
+    sendInitialPrompt(prompt)
+  }, [chatId, searchParams])
+
+  const sendInitialPrompt = async (prompt: string) => {
+    setIsSubmitting(true)
+
+    const uid = await getOrCreateGuestUserId(user)
+    if (!uid) return
+
+    const allowed = await checkLimitsAndNotify(uid)
+    if (!allowed) {
+      setIsSubmitting(false)
+      return
+    }
+
+    const options = {
+      body: {
+        chatId,
+        userId: uid,
+        model: selectedModel,
+        isAuthenticated,
+        systemPrompt,
+      },
+    }
+
+    try {
+      append({ role: "user", content: prompt }, options)
+    } catch (err) {
+      toast({ title: "Failed to send prompt", status: "error" })
+    } finally {
+      setIsSubmitting(false)
+      router.replace(`/c/${chatId}`)
+    }
   }
 
   const checkLimitsAndNotify = async (uid: string): Promise<boolean> => {
@@ -134,20 +183,29 @@ export default function Chat({ chatId: propChatId }: ChatProps) {
   }
 
   const ensureChatExists = async (userId: string) => {
-    if (isFirstMessage) {
+    if (!isAuthenticated) {
+      const storedGuestChatId = localStorage.getItem("guestChatId")
+      if (storedGuestChatId) return storedGuestChatId
+    }
+
+    if (messages.length === 0) {
       try {
         const newChat = await createNewChat(
           userId,
           input,
           selectedModel,
           isAuthenticated,
-          systemPrompt
+          selectedAgentId ? undefined : systemPrompt, // if agentId is set, systemPrompt is not used
+          selectedAgentId || undefined
         )
+
         if (!newChat) return null
-        setChatId(newChat.id)
         if (isAuthenticated) {
           window.history.pushState(null, "", `/c/${newChat.id}`)
+        } else {
+          localStorage.setItem("guestChatId", newChat.id)
         }
+
         return newChat.id
       } catch (err: any) {
         let errorMessage = "Something went wrong."
@@ -164,6 +222,7 @@ export default function Chat({ chatId: propChatId }: ChatProps) {
         return null
       }
     }
+
     return chatId
   }
 
@@ -241,7 +300,7 @@ export default function Chat({ chatId: propChatId }: ChatProps) {
   const submit = async () => {
     setIsSubmitting(true)
 
-    const uid = await getOrCreateGuestUserId()
+    const uid = await getOrCreateGuestUserId(user)
     if (!uid) return
 
     const optimisticId = `optimistic-${Date.now().toString()}`
@@ -308,6 +367,7 @@ export default function Chat({ chatId: propChatId }: ChatProps) {
         model: selectedModel,
         isAuthenticated,
         systemPrompt: systemPrompt || SYSTEM_PROMPT_DEFAULT,
+        agentId: selectedAgentId || undefined,
       },
       experimental_attachments: attachments || undefined,
     }
@@ -366,7 +426,7 @@ export default function Chat({ chatId: propChatId }: ChatProps) {
 
       setMessages((prev) => [...prev, optimisticMessage])
 
-      const uid = await getOrCreateGuestUserId()
+      const uid = await getOrCreateGuestUserId(user)
 
       if (!uid) {
         setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId))
@@ -417,7 +477,7 @@ export default function Chat({ chatId: propChatId }: ChatProps) {
   }, [])
 
   const handleReload = async () => {
-    const uid = await getOrCreateGuestUserId()
+    const uid = await getOrCreateGuestUserId(user)
     if (!uid) {
       return
     }
@@ -436,7 +496,7 @@ export default function Chat({ chatId: propChatId }: ChatProps) {
   }
 
   // not user chatId and no messages
-  if (propChatId && !currentChat && messages.length === 0) {
+  if (hydrated && chatId && !isChatsLoading && !currentChat) {
     return redirect("/")
   }
 
@@ -448,7 +508,7 @@ export default function Chat({ chatId: propChatId }: ChatProps) {
     >
       <DialogAuth open={hasDialogAuth} setOpen={setHasDialogAuth} />
       <AnimatePresence initial={false} mode="popLayout">
-        {!propChatId && messages.length === 0 ? (
+        {!chatId && messages.length === 0 ? (
           <motion.div
             key="onboarding"
             className="absolute bottom-[60%] mx-auto max-w-[50rem] md:relative md:bottom-auto"
@@ -499,7 +559,7 @@ export default function Chat({ chatId: propChatId }: ChatProps) {
           files={files}
           onFileUpload={handleFileUpload}
           onFileRemove={handleFileRemove}
-          hasSuggestions={isFirstMessage}
+          hasSuggestions={!chatId && messages.length === 0}
           onSelectModel={handleModelChange}
           onSelectSystemPrompt={handleSelectSystemPrompt}
           selectedModel={selectedModel}
@@ -507,6 +567,8 @@ export default function Chat({ chatId: propChatId }: ChatProps) {
           systemPrompt={systemPrompt}
           stop={stop}
           status={status}
+          setSelectedAgentId={setSelectedAgentId}
+          selectedAgentId={selectedAgentId}
         />
       </motion.div>
       <FeedbackWidget authUserId={user?.id} />

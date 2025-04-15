@@ -13,33 +13,28 @@ let dbReady = false
 let dbInitPromise: Promise<void> | null = null
 let stores: Record<string, any> = {}
 
-// Only run on client side
 const isClient = typeof window !== "undefined"
-
 const DB_NAME = "zola-db"
-const DB_VERSION = 1
+const DB_VERSION = 2
 
-// Initialize the database with proper versioning
+let storesReady = false
+let storesReadyResolve: () => void = () => {}
+const storesReadyPromise = new Promise<void>((resolve) => {
+  storesReadyResolve = resolve
+})
+
 function initDatabase() {
-  if (!isClient) {
-    return Promise.resolve()
-  }
+  if (!isClient) return Promise.resolve()
 
   return new Promise<void>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
 
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = () => {
       const db = request.result
-
-      if (!db.objectStoreNames.contains("chats")) {
-        db.createObjectStore("chats")
-      }
-      if (!db.objectStoreNames.contains("messages")) {
+      if (!db.objectStoreNames.contains("chats")) db.createObjectStore("chats")
+      if (!db.objectStoreNames.contains("messages"))
         db.createObjectStore("messages")
-      }
-      if (!db.objectStoreNames.contains("sync")) {
-        db.createObjectStore("sync")
-      }
+      if (!db.objectStoreNames.contains("sync")) db.createObjectStore("sync")
     }
 
     request.onsuccess = () => {
@@ -54,82 +49,170 @@ function initDatabase() {
   })
 }
 
-// Initialize only on client side, only Version 1
-// clean up indexedDB database
 if (isClient) {
   const checkRequest = indexedDB.open(DB_NAME)
 
   checkRequest.onsuccess = () => {
     const db = checkRequest.result
-
     if (db.version > DB_VERSION) {
       db.close()
-      indexedDB.deleteDatabase(DB_NAME).onsuccess = () => {
-        init()
+      const deleteRequest = indexedDB.deleteDatabase(DB_NAME)
+      deleteRequest.onsuccess = () => {
+        initDatabaseAndStores()
+      }
+      deleteRequest.onerror = (event) => {
+        console.error("Database deletion failed:", event)
+        initDatabaseAndStores()
       }
     } else {
       db.close()
-      init()
+      initDatabaseAndStores()
     }
   }
 
   checkRequest.onerror = () => {
-    // fallback if open fails (possibly first time)
-    init()
+    initDatabaseAndStores()
   }
+}
 
-  function init() {
-    dbInitPromise = initDatabase()
-    dbInitPromise.then(() => {
-      stores = {
-        chats: createStore(DB_NAME, "chats"),
-        messages: createStore(DB_NAME, "messages"),
-        sync: createStore(DB_NAME, "sync"),
+function initDatabaseAndStores(): void {
+  dbInitPromise = initDatabase()
+
+  dbInitPromise
+    .then(() => {
+      const openRequest = indexedDB.open(DB_NAME)
+
+      openRequest.onsuccess = () => {
+        const objectStores = Array.from(openRequest.result.objectStoreNames)
+
+        if (objectStores.length === 0) {
+          openRequest.result.close()
+
+          // Delete and recreate the database to force onupgradeneeded
+          const deleteRequest = indexedDB.deleteDatabase(DB_NAME)
+          deleteRequest.onsuccess = () => {
+            dbInitPromise = initDatabase() // Reinitialize with proper stores
+            dbInitPromise.then(() => {
+              // Try opening again to create stores
+              const reopenRequest = indexedDB.open(DB_NAME)
+              reopenRequest.onsuccess = () => {
+                const newObjectStores = Array.from(
+                  reopenRequest.result.objectStoreNames
+                )
+
+                if (newObjectStores.includes("chats"))
+                  stores.chats = createStore(DB_NAME, "chats")
+                if (newObjectStores.includes("messages"))
+                  stores.messages = createStore(DB_NAME, "messages")
+                if (newObjectStores.includes("sync"))
+                  stores.sync = createStore(DB_NAME, "sync")
+
+                storesReady = true
+                storesReadyResolve()
+                reopenRequest.result.close()
+              }
+
+              reopenRequest.onerror = (event) => {
+                console.error(
+                  "Failed to reopen database after recreation:",
+                  event
+                )
+                storesReady = true
+                storesReadyResolve()
+              }
+            })
+          }
+
+          return // Skip the rest of this function
+        }
+
+        // Continue with existing logic for when stores are found
+        if (objectStores.includes("chats"))
+          stores.chats = createStore(DB_NAME, "chats")
+        if (objectStores.includes("messages"))
+          stores.messages = createStore(DB_NAME, "messages")
+        if (objectStores.includes("sync"))
+          stores.sync = createStore(DB_NAME, "sync")
+
+        storesReady = true
+        storesReadyResolve()
+        openRequest.result.close()
+      }
+
+      openRequest.onerror = (event) => {
+        console.error("Failed to open database for store creation:", event)
+        storesReady = true
+        storesReadyResolve()
       }
     })
-  }
+    .catch((error) => {
+      console.error("Database initialization failed:", error)
+      storesReady = true
+      storesReadyResolve()
+    })
 }
 
-// Ensure DB is ready before operations (client-side only)
-async function ensureDbReady() {
-  if (!isClient) return
-  if (!dbReady && dbInitPromise) {
-    await dbInitPromise
+export async function ensureDbReady() {
+  if (!isClient) {
+    console.warn("ensureDbReady: not client")
+    return
   }
+  if (dbInitPromise) await dbInitPromise
+  if (!storesReady) await storesReadyPromise
 }
 
-// read one or all items from a store
 export async function readFromIndexedDB<T>(
   table: "chats" | "messages" | "sync",
   key?: string
 ): Promise<T | T[]> {
-  if (!isClient) return key ? (null as any) : []
-
   await ensureDbReady()
+
+  if (!isClient) {
+    console.warn("readFromIndexedDB: not client")
+    return key ? (null as any) : []
+  }
+
+  if (!stores[table]) {
+    console.warn("readFromIndexedDB: store not initialized")
+    return key ? (null as any) : []
+  }
+
   try {
     const store = stores[table]
     if (key) {
-      const item = await get<T>(key, store)
-      return item as T
+      const result = await get<T>(key, store)
+      return result as T
     }
 
     const allKeys = await keys(store)
-    const values = await getMany<T>(allKeys as string[], store)
-    return values
+    if (allKeys.length > 0) {
+      const results = await getMany<T>(allKeys as string[], store)
+      return results.filter(Boolean)
+    }
+
+    return []
   } catch (error) {
-    console.log(`Error reading from IndexedDB store '${table}':`, error)
+    console.warn(`readFromIndexedDB failed (${table}):`, error)
     return key ? (null as any) : []
   }
 }
 
-// write one or multiple items to a store
 export async function writeToIndexedDB<T extends { id: string | number }>(
   table: "chats" | "messages" | "sync",
   data: T | T[]
 ): Promise<void> {
-  if (!isClient) return
-
   await ensureDbReady()
+
+  if (!isClient) {
+    console.warn("writeToIndexedDB: not client")
+    return
+  }
+
+  if (!stores[table]) {
+    console.warn("writeToIndexedDB: store not initialized")
+    return
+  }
+
   try {
     const store = stores[table]
     const entries: [IDBValidKey, T][] = Array.isArray(data)
@@ -138,20 +221,28 @@ export async function writeToIndexedDB<T extends { id: string | number }>(
 
     await setMany(entries, store)
   } catch (error) {
-    console.error(`Error writing to IndexedDB store '${table}':`, error)
+    console.warn(`writeToIndexedDB failed (${table}):`, error)
   }
 }
 
-// delete one or all items from a store
 export async function deleteFromIndexedDB(
   table: "chats" | "messages" | "sync",
   key?: string
 ): Promise<void> {
-  if (!isClient) return
-
   await ensureDbReady()
+
+  if (!isClient) {
+    console.warn("deleteFromIndexedDB: not client")
+    return
+  }
+
+  const store = stores[table]
+  if (!store) {
+    console.warn(`Store '${table}' not initialized.`)
+    return
+  }
+
   try {
-    const store = stores[table]
     if (key) {
       await del(key, store)
     } else {
@@ -164,7 +255,10 @@ export async function deleteFromIndexedDB(
 }
 
 export async function clearAllIndexedDBStores() {
-  if (!isClient) return
+  if (!isClient) {
+    console.warn("clearAllIndexedDBStores: not client")
+    return
+  }
 
   await ensureDbReady()
   await deleteFromIndexedDB("chats")

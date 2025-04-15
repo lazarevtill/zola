@@ -1,15 +1,10 @@
+import { Chat } from "@/app/components/chat/chat"
+import { LayoutApp } from "@/app/components/layout/layout-app"
 import { MessagesProvider } from "@/lib/chat-store/messages/provider"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import Chat from "../../components/chat/chat"
-import LayoutApp from "../../components/layout/layout-app"
 
-export default async function PrivatePage({
-  params,
-}: {
-  params: Promise<{ chatId: string }>
-}) {
-  const { chatId } = await params
+export default async function Page() {
   const supabase = await createClient()
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
@@ -19,9 +14,9 @@ export default async function PrivatePage({
   }
 
   return (
-    <MessagesProvider chatId={chatId}>
+    <MessagesProvider>
       <LayoutApp>
-        <Chat chatId={chatId} />
+        <Chat />
       </LayoutApp>
     </MessagesProvider>
   )

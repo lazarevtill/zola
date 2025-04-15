@@ -16,6 +16,7 @@ import {
 interface ChatsContextType {
   chats: Chats[]
   refresh: () => Promise<void>
+  isLoading: boolean
   updateTitle: (id: string, title: string) => Promise<void>
   deleteChat: (
     id: string,
@@ -28,7 +29,8 @@ interface ChatsContextType {
     title?: string,
     model?: string,
     isAuthenticated?: boolean,
-    systemPrompt?: string
+    systemPrompt?: string,
+    agentId?: string
   ) => Promise<Chats | undefined>
   resetChats: () => Promise<void>
   getChatById: (id: string) => Chats | undefined
@@ -49,17 +51,25 @@ export function ChatsProvider({
   userId?: string
   children: React.ReactNode
 }) {
+  const [isLoading, setIsLoading] = useState(false)
   const [chats, setChats] = useState<Chats[]>([])
 
   useEffect(() => {
     if (!userId) return
 
     const load = async () => {
+      setIsLoading(true)
       const cached = await getCachedChats()
       setChats(cached)
-      const fresh = await fetchAndCacheChats(userId)
-      setChats(fresh)
+
+      try {
+        const fresh = await fetchAndCacheChats(userId)
+        setChats(fresh)
+      } finally {
+        setIsLoading(false)
+      }
     }
+
     load()
   }, [userId])
 
@@ -103,7 +113,8 @@ export function ChatsProvider({
     title?: string,
     model?: string,
     isAuthenticated?: boolean,
-    systemPrompt?: string
+    systemPrompt?: string,
+    agentId?: string
   ) => {
     if (!userId) return
     const prev = [...chats]
@@ -111,10 +122,11 @@ export function ChatsProvider({
     const optimisticId = `optimistic-${Date.now().toString()}`
     const optimisticChat = {
       id: optimisticId,
-      title: title || "New Chat",
+      title: title || (agentId ? `Conversation with agent` : "New Chat"),
       created_at: new Date().toISOString(),
       model: model || MODEL_DEFAULT,
       system_prompt: systemPrompt || SYSTEM_PROMPT_DEFAULT,
+      agent_id: agentId || null,
     }
     setChats((prev) => [...prev, optimisticChat])
 
@@ -124,7 +136,8 @@ export function ChatsProvider({
         title,
         model,
         isAuthenticated,
-        systemPrompt
+        systemPrompt,
+        agentId
       )
       setChats((prev) =>
         prev
@@ -166,6 +179,7 @@ export function ChatsProvider({
         resetChats,
         getChatById,
         updateChatModel,
+        isLoading,
       }}
     >
       {children}
