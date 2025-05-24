@@ -1,4 +1,5 @@
 import { createGuestServerClient } from "@/lib/supabase/server-guest"
+import escapeHtml from "escape-html";
 
 export async function POST(request: Request) {
   try {
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
     if (!supabase) {
       console.log("Supabase not enabled, skipping guest creation.")
       return new Response(
-        JSON.stringify({ user: { id: userId, anonymous: true } }),
+        JSON.stringify({ user: { id: escapeHtml(userId), anonymous: true } }),
         {
           status: 200,
         }
