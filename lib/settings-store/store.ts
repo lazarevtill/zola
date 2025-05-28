@@ -52,7 +52,7 @@ type SettingsStore = SettingsState & SettingsActions
 
 export const useSettingsStore = create<SettingsStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       providers: defaultProviders,
       customProviders: [],
 

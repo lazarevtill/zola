@@ -1,32 +1,31 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { getAllModels, refreshModelsCache } from "@/lib/models"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url)
-    const refresh = searchParams.get("refresh") === "true"
-    
-    if (refresh) {
-      refreshModelsCache()
-    }
-    
     const models = await getAllModels()
-    
-    return NextResponse.json({
-      models,
-      timestamp: new Date().toISOString(),
-      count: models.length,
+
+    return new Response(JSON.stringify({ models }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+      },
     })
   } catch (error) {
-    console.error("Failed to fetch models:", error)
-    return NextResponse.json(
-      { error: "Failed to fetch models" },
-      { status: 500 }
+    console.error("Error fetching models:", error)
+    return new Response(
+      JSON.stringify({ error: "Failed to fetch models" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
     )
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     // Refresh the models cache
     refreshModelsCache()
