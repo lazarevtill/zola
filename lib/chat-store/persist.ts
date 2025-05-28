@@ -5,11 +5,9 @@ import {
   get,
   getMany,
   keys,
-  set,
   setMany,
 } from "idb-keyval"
 
-let dbReady = false
 let dbInitPromise: Promise<void> | null = null
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const stores: Record<string, any> = {}
@@ -39,7 +37,6 @@ function initDatabase() {
     }
 
     request.onsuccess = () => {
-      dbReady = true
       request.result.close()
       resolve()
     }
@@ -170,12 +167,12 @@ export async function readFromIndexedDB<T>(
 
   if (!isClient) {
     console.warn("readFromIndexedDB: not client")
-    return key ? (null as any) : []
+    return key ? (null as T) : []
   }
 
   if (!stores[table]) {
     console.warn("readFromIndexedDB: store not initialized")
-    return key ? (null as any) : []
+    return key ? (null as T) : []
   }
 
   try {
@@ -194,7 +191,7 @@ export async function readFromIndexedDB<T>(
     return []
   } catch (error) {
     console.warn(`readFromIndexedDB failed (${table}):`, error)
-    return key ? (null as any) : []
+    return key ? (null as T) : []
   }
 }
 

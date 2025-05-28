@@ -89,7 +89,7 @@ async function detectOllamaModels(): Promise<ModelConfig[]> {
         website: "https://ollama.com",
         apiDocs: "https://github.com/ollama/ollama/blob/main/docs/api.md",
         modelPage: `https://ollama.com/library/${modelName.split(':')[0]}`,
-        apiSdk: () => openproviders(modelName as any),
+        apiSdk: () => openproviders(modelName as string),
       }
     })
   } catch (error) {
@@ -256,7 +256,7 @@ const staticOllamaModels: ModelConfig[] = [
     website: "https://ollama.com",
     apiDocs: "https://github.com/ollama/ollama/blob/main/docs/api.md",
     modelPage: "https://ollama.com/library/llama3.2",
-    apiSdk: () => openproviders("llama3.2:latest" as any),
+    apiSdk: () => openproviders("llama3.2:latest" as string),
   },
   {
     id: "qwen2.5-coder:latest",
@@ -280,7 +280,7 @@ const staticOllamaModels: ModelConfig[] = [
     website: "https://ollama.com",
     apiDocs: "https://github.com/ollama/ollama/blob/main/docs/api.md",
     modelPage: "https://ollama.com/library/qwen2.5-coder",
-    apiSdk: () => openproviders("qwen2.5-coder:latest" as any),
+    apiSdk: () => openproviders("qwen2.5-coder:latest" as string),
   },
 ]
 
