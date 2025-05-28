@@ -64,7 +64,7 @@ jobs:
       
       - name: Check build cache
         id: check-build-cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: .next
           key: ${{ steps.build-cache.outputs.key }}
@@ -75,13 +75,13 @@ jobs:
       
       - name: Cache build output
         if: steps.check-build-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: .next
           key: ${{ steps.build-cache.outputs.key }}
       
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-output
           path: |
@@ -105,7 +105,7 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Download build artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: build-output
           path: .
