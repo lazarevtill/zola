@@ -10,10 +10,6 @@ const nextConfig: NextConfig = withBundleAnalyzer({
     optimizePackageImports: ["@phosphor-icons/react"],
     nodeMiddleware: true,
   },
-  eslint: {
-    // @todo: remove before going live
-    ignoreDuringBuilds: true,
-  },
 })
 
 export default nextConfig
