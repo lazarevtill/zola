@@ -220,7 +220,7 @@ export function Chat() {
 
     let attachments: Attachment[] | null = []
     if (submittedFiles.length > 0) {
-      attachments = await handleFileUploads(uid, currentChatId)
+      attachments = await handleFileUploads(uid, currentChatId, isAuthenticated)
       if (attachments === null) {
         setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
         cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)

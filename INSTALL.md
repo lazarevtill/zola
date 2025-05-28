@@ -216,15 +216,239 @@ CREATE TABLE feedback (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT feedback_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
--- RLS (Row Level Security) Reminder
--- Ensure RLS is enabled on these tables in your Supabase dashboard
--- and appropriate policies are created.
--- Example policies (adapt as needed):
--- ALTER TABLE users ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Users can view their own data." ON users FOR SELECT USING (auth.uid() = id);
--- CREATE POLICY "Users can update their own data." ON users FOR UPDATE USING (auth.uid() = id);
--- ... add policies for other tables (agents, chats, messages, etc.) ...
+
+-- Enable Row Level Security on all tables
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE agents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_attachments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
+
+-- Users table policies
+-- Users can view and update their own data
+CREATE POLICY "Users can view their own data" ON users 
+  FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Users can update their own data" ON users 
+  FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Users can insert their own data" ON users 
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Service role can manage all users (for auth callbacks and admin operations)
+CREATE POLICY "Service role can manage users" ON users 
+  FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+
+-- Agents table policies
+-- Public agents are viewable by everyone
+CREATE POLICY "Public agents are viewable by everyone" ON agents 
+  FOR SELECT USING (is_public = true);
+
+-- Users can view their own agents
+CREATE POLICY "Users can view their own agents" ON agents 
+  FOR SELECT USING (auth.uid() = creator_id);
+
+-- Users can create agents
+CREATE POLICY "Users can create agents" ON agents 
+  FOR INSERT WITH CHECK (auth.uid() = creator_id);
+
+-- Users can update their own agents
+CREATE POLICY "Users can update their own agents" ON agents 
+  FOR UPDATE USING (auth.uid() = creator_id);
+
+-- Users can delete their own agents
+CREATE POLICY "Users can delete their own agents" ON agents 
+  FOR DELETE USING (auth.uid() = creator_id);
+
+-- Chats table policies
+-- Users can view their own chats
+CREATE POLICY "Users can view their own chats" ON chats 
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- Public chats are viewable by everyone
+CREATE POLICY "Public chats are viewable by everyone" ON chats 
+  FOR SELECT USING (public = true);
+
+-- Users can create their own chats
+CREATE POLICY "Users can create their own chats" ON chats 
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Users can update their own chats
+CREATE POLICY "Users can update their own chats" ON chats 
+  FOR UPDATE USING (auth.uid() = user_id);
+
+-- Users can delete their own chats
+CREATE POLICY "Users can delete their own chats" ON chats 
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- Messages table policies
+-- Users can view messages from their own chats
+CREATE POLICY "Users can view messages from their own chats" ON messages 
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM chats 
+      WHERE chats.id = messages.chat_id 
+      AND chats.user_id = auth.uid()
+    )
+  );
+
+-- Users can view messages from public chats
+CREATE POLICY "Users can view messages from public chats" ON messages 
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM chats 
+      WHERE chats.id = messages.chat_id 
+      AND chats.public = true
+    )
+  );
+
+-- Users can insert messages to their own chats
+CREATE POLICY "Users can insert messages to their own chats" ON messages 
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM chats 
+      WHERE chats.id = messages.chat_id 
+      AND chats.user_id = auth.uid()
+    )
+  );
+
+-- Users can update messages in their own chats
+CREATE POLICY "Users can update messages in their own chats" ON messages 
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM chats 
+      WHERE chats.id = messages.chat_id 
+      AND chats.user_id = auth.uid()
+    )
+  );
+
+-- Users can delete messages from their own chats
+CREATE POLICY "Users can delete messages from their own chats" ON messages 
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM chats 
+      WHERE chats.id = messages.chat_id 
+      AND chats.user_id = auth.uid()
+    )
+  );
+
+-- Chat attachments table policies
+-- Users can view attachments from their own chats (works for both auth and anon users)
+CREATE POLICY "Users can view attachments from their own chats" ON chat_attachments 
+  FOR SELECT USING (
+    -- Allow if user owns the chat (for authenticated users)
+    (auth.uid() IS NOT NULL AND EXISTS (
+      SELECT 1 FROM chats 
+      WHERE chats.id = chat_attachments.chat_id 
+      AND chats.user_id = auth.uid()
+    ))
+    OR
+    -- Allow if user_id matches (for anonymous users with service role)
+    (auth.jwt() ->> 'role' = 'service_role' AND user_id IS NOT NULL)
+  );
+
+-- Users can view attachments from public chats
+CREATE POLICY "Users can view attachments from public chats" ON chat_attachments 
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM chats 
+      WHERE chats.id = chat_attachments.chat_id 
+      AND chats.public = true
+    )
+  );
+
+-- Users can upload attachments (works for both auth and anon users)
+CREATE POLICY "Users can upload attachments to their own chats" ON chat_attachments 
+  FOR INSERT WITH CHECK (
+    -- Allow if authenticated user owns the chat
+    (auth.uid() IS NOT NULL AND 
+     auth.uid() = user_id AND
+     EXISTS (
+       SELECT 1 FROM chats 
+       WHERE chats.id = chat_attachments.chat_id 
+       AND chats.user_id = auth.uid()
+     ))
+    OR
+    -- Allow service role to insert for any user (for anonymous users)
+    (auth.jwt() ->> 'role' = 'service_role' AND user_id IS NOT NULL)
+  );
+
+-- Users can delete their own attachments
+CREATE POLICY "Users can delete their own attachments" ON chat_attachments 
+  FOR DELETE USING (
+    (auth.uid() IS NOT NULL AND auth.uid() = user_id)
+    OR
+    (auth.jwt() ->> 'role' = 'service_role')
+  );
+
+-- Feedback table policies
+-- Users can view their own feedback
+CREATE POLICY "Users can view their own feedback" ON feedback 
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- Users can create their own feedback
+CREATE POLICY "Users can create their own feedback" ON feedback 
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Users can update their own feedback
+CREATE POLICY "Users can update their own feedback" ON feedback 
+  FOR UPDATE USING (auth.uid() = user_id);
+
+-- Users can delete their own feedback
+CREATE POLICY "Users can delete their own feedback" ON feedback 
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- Storage policies for buckets
+-- Note: These should be created in the Supabase Storage section, not via SQL
+
+-- For 'avatars' bucket:
+-- CREATE POLICY "Public read access for avatars" ON storage.objects 
+--   FOR SELECT USING (bucket_id = 'avatars');
+-- CREATE POLICY "Users can upload their own avatars" ON storage.objects 
+--   FOR INSERT WITH CHECK (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+-- For 'chat-attachments' bucket:
+-- CREATE POLICY "Users can view attachments from their chats" ON storage.objects 
+--   FOR SELECT USING (
+--     bucket_id = 'chat-attachments' AND
+--     EXISTS (
+--       SELECT 1 FROM chat_attachments ca
+--       JOIN chats c ON ca.chat_id = c.id
+--       WHERE ca.file_url LIKE '%' || name || '%'
+--       AND c.user_id = auth.uid()
+--     )
+--   );
+-- CREATE POLICY "Users can upload to chat-attachments" ON storage.objects 
+--   FOR INSERT WITH CHECK (bucket_id = 'chat-attachments' AND auth.uid() IS NOT NULL);
 ```
+
+### Set up RLS policies
+
+After creating the database schema, you need to set up Row Level Security (RLS) policies to ensure proper data isolation and security. Copy and paste the RLS policies from the SQL script above into your Supabase SQL editor.
+
+**Important Security Notes:**
+
+1. **Enable RLS on all tables**: The policies above enable RLS on all user-data tables to prevent unauthorized access.
+
+2. **User data isolation**: Each user can only access their own chats, messages, and attachments.
+
+3. **Public content**: Agents marked as `is_public = true` and chats marked as `public = true` are viewable by all users.
+
+4. **Service role access**: The service role (used for auth callbacks and admin operations) has full access to manage users.
+
+5. **Storage bucket policies**: For file uploads, you'll need to create storage policies in the Supabase dashboard:
+   - Go to Storage > Policies
+   - Create policies for the `avatars` and `chat-attachments` buckets
+   - Use the commented storage policy examples above as reference
+
+**Testing RLS Policies:**
+
+After setting up the policies, test them by:
+1. Creating a test user and logging in
+2. Verifying they can only see their own data
+3. Testing public content visibility
+4. Ensuring file uploads work correctly
 
 ### Storage Setup
 

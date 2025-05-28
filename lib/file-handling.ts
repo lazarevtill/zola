@@ -2,6 +2,7 @@ import { toast } from "@/components/ui/toast"
 import { SupabaseClient } from "@supabase/supabase-js"
 import * as fileType from "file-type"
 import { DAILY_FILE_UPLOAD_LIMIT } from "./config"
+import { fetchClient } from "./fetch"
 import { createClient } from "./supabase/client"
 import { isSupabaseEnabled } from "./supabase/config"
 
@@ -85,7 +86,8 @@ export function createAttachment(file: File, url: string): Attachment {
 export async function processFiles(
   files: File[],
   chatId: string,
-  userId: string
+  userId: string,
+  isAuthenticated: boolean = false
 ): Promise<Attachment[]> {
   const supabase = isSupabaseEnabled ? createClient() : null
   const attachments: Attachment[] = []
@@ -108,17 +110,23 @@ export async function processFiles(
         : URL.createObjectURL(file)
 
       if (supabase) {
-        const { error } = await supabase.from("chat_attachments").insert({
-          chat_id: chatId,
-          user_id: userId,
-          file_url: url,
-          file_name: file.name,
-          file_type: file.type,
-          file_size: file.size,
+        const response = await fetchClient("/api/chat-attachments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            user_id: userId,
+            file_url: url,
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            isAuthenticated,
+          }),
         })
 
-        if (error) {
-          throw new Error(`Database insertion failed: ${error.message}`)
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(`Database insertion failed: ${errorData.error || response.statusText}`)
         }
       }
 

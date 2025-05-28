@@ -60,6 +60,29 @@ cd zola
 docker-compose -f docker-compose.ollama.yml up
 ```
 
+### Option 4: Self-Hosted with Supabase + Docker
+
+For a complete self-hosted solution with database, auth, and storage:
+
+```bash
+git clone https://github.com/ibelick/zola.git
+cd zola
+
+# Quick setup with interactive script
+./scripts/setup-supabase-docker.sh
+
+# Or manual setup
+cp env.supabase.example .env.supabase
+# Edit .env.supabase with your configuration
+docker-compose -f docker-compose.supabase-ollama.yml --env-file .env.supabase up -d
+```
+
+**Available Docker configurations:**
+- `docker-compose.supabase.yml` - Self-hosted Supabase + Zola (cloud AI)
+- `docker-compose.supabase-ollama.yml` - Complete self-hosted stack with local AI
+
+See [DOCKER_DEPLOYMENT.md](./DOCKER_DEPLOYMENT.md) for detailed deployment guide.
+
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/ibelick/zola)
 
 To unlock features like auth, file uploads, and agents, see [INSTALL.md](./INSTALL.md).

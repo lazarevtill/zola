@@ -11,7 +11,8 @@ export const useFileUpload = () => {
 
   const handleFileUploads = async (
     uid: string,
-    chatId: string
+    chatId: string,
+    isAuthenticated: boolean = false
   ): Promise<Attachment[] | null> => {
     if (files.length === 0) return []
 
@@ -26,7 +27,7 @@ export const useFileUpload = () => {
     }
 
     try {
-      const processed = await processFiles(files, chatId, uid)
+      const processed = await processFiles(files, chatId, uid, isAuthenticated)
       setFiles([])
       return processed
     } catch {
