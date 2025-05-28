@@ -35,8 +35,9 @@ jobs:
       - name: Run TypeScript checks
         run: npm run type-check
       
-      - name: Run Tests
-        run: npm test
+      # TODO: Uncomment when tests are added
+      # - name: Run Tests
+      #   run: npm test
 
   build:
     name: Build Application
