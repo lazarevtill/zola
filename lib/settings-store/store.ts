@@ -57,11 +57,32 @@ export const useSettingsStore = create<SettingsStore>()(
       customProviders: [],
 
       updateProvider: (id: string, settings: Partial<ProviderSettings>) => {
-        set((state: SettingsStore) => ({
-          providers: state.providers.map((provider: ProviderSettings) =>
-            provider.id === id ? { ...provider, ...settings } : provider
-          ),
-        }))
+        set((state: SettingsStore) => {
+          // Check if it's a regular provider
+          const providerIndex = state.providers.findIndex(p => p.id === id)
+          if (providerIndex !== -1) {
+            return {
+              ...state,
+              providers: state.providers.map((provider: ProviderSettings) =>
+                provider.id === id ? { ...provider, ...settings } : provider
+              ),
+            }
+          }
+          
+          // Check if it's a custom provider
+          const customProviderIndex = state.customProviders.findIndex(p => p.id === id)
+          if (customProviderIndex !== -1) {
+            return {
+              ...state,
+              customProviders: state.customProviders.map((provider: OpenAICompatibleProvider) =>
+                provider.id === id ? { ...provider, ...settings } as OpenAICompatibleProvider : provider
+              ),
+            }
+          }
+          
+          // If provider not found, return current state
+          return state
+        })
       },
 
       addCustomProvider: (provider: OpenAICompatibleProvider) => {

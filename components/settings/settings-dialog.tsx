@@ -15,7 +15,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useSettingsStore } from "@/lib/settings-store/store"
 import { OpenAICompatibleProvider } from "@/lib/settings-store/types"
-import { Gear, Plus, Trash } from "@phosphor-icons/react"
+import { Gear, Plus, Trash, Eye, EyeSlash } from "@phosphor-icons/react"
 import { useState } from "react"
 
 interface SettingsDialogProps {
@@ -25,27 +25,37 @@ interface SettingsDialogProps {
 export function SettingsDialog({ children }: SettingsDialogProps) {
   const { providers, customProviders, updateProvider, addCustomProvider, removeCustomProvider } = useSettingsStore()
   const [isOpen, setIsOpen] = useState(false)
+  const [isAdding, setIsAdding] = useState(false)
+  const [showApiKey, setShowApiKey] = useState(false)
   const [newProvider, setNewProvider] = useState({
     name: '',
     baseUrl: '',
     apiKey: '',
   })
 
-  const handleAddCustomProvider = () => {
-    if (!newProvider.name || !newProvider.baseUrl) return
+  const handleAddCustomProvider = async () => {
+    if (!newProvider.name.trim() || !newProvider.baseUrl.trim()) return
 
-    const provider: OpenAICompatibleProvider = {
-      id: `custom-${Date.now()}`,
-      name: newProvider.name,
-      baseUrl: newProvider.baseUrl,
-      apiKey: newProvider.apiKey,
-      enabled: true,
-      type: 'openai-compatible',
+    setIsAdding(true)
+    try {
+      const provider: OpenAICompatibleProvider = {
+        id: `custom-${Date.now()}`,
+        name: newProvider.name.trim(),
+        baseUrl: newProvider.baseUrl.trim(),
+        apiKey: newProvider.apiKey.trim(),
+        enabled: true,
+        type: 'openai-compatible',
+      }
+
+      addCustomProvider(provider)
+      setNewProvider({ name: '', baseUrl: '', apiKey: '' })
+      setShowApiKey(false)
+    } finally {
+      setIsAdding(false)
     }
-
-    addCustomProvider(provider)
-    setNewProvider({ name: '', baseUrl: '', apiKey: '' })
   }
+
+  const isFormValid = newProvider.name.trim() && newProvider.baseUrl.trim()
 
   const trigger = children || (
     <Button variant="ghost" size="sm">
@@ -95,6 +105,19 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                         />
                       </div>
                     )}
+                    {provider.type !== 'ollama' && (
+                      <div className="space-y-2">
+                        <Label htmlFor={`${provider.id}-key`} className="text-sm">API Key</Label>
+                        <Input
+                          id={`${provider.id}-key`}
+                          type="password"
+                          value={provider.apiKey || ''}
+                          onChange={(e) => updateProvider(provider.id, { apiKey: e.target.value })}
+                          placeholder="Enter API key..."
+                          className="w-48"
+                        />
+                      </div>
+                    )}
                     <Switch
                       checked={provider.enabled}
                       onCheckedChange={(enabled) => updateProvider(provider.id, { enabled })}
@@ -114,37 +137,60 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                 <h4 className="font-medium">Add New Provider</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="provider-name">Provider Name</Label>
+                    <Label htmlFor="provider-name">Provider Name *</Label>
                     <Input
                       id="provider-name"
                       value={newProvider.name}
                       onChange={(e) => setNewProvider({ ...newProvider, name: e.target.value })}
                       placeholder="My Custom Provider"
+                      disabled={isAdding}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="provider-url">Base URL</Label>
+                    <Label htmlFor="provider-url">Base URL *</Label>
                     <Input
                       id="provider-url"
                       value={newProvider.baseUrl}
                       onChange={(e) => setNewProvider({ ...newProvider, baseUrl: e.target.value })}
                       placeholder="https://api.example.com/v1"
+                      disabled={isAdding}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="provider-key">API Key (Optional)</Label>
-                  <Input
-                    id="provider-key"
-                    type="password"
-                    value={newProvider.apiKey}
-                    onChange={(e) => setNewProvider({ ...newProvider, apiKey: e.target.value })}
-                    placeholder="sk-..."
-                  />
+                  <div className="relative">
+                    <Input
+                      id="provider-key"
+                      type={showApiKey ? "text" : "password"}
+                      value={newProvider.apiKey}
+                      onChange={(e) => setNewProvider({ ...newProvider, apiKey: e.target.value })}
+                      placeholder="sk-..."
+                      disabled={isAdding}
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      disabled={isAdding}
+                    >
+                      {showApiKey ? (
+                        <EyeSlash className="size-4" />
+                      ) : (
+                        <Eye className="size-4" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
-                <Button onClick={handleAddCustomProvider} disabled={!newProvider.name || !newProvider.baseUrl}>
+                <Button 
+                  onClick={handleAddCustomProvider} 
+                  disabled={!isFormValid || isAdding}
+                >
                   <Plus className="size-4 mr-2" />
-                  Add Provider
+                  {isAdding ? "Adding..." : "Add Provider"}
                 </Button>
               </div>
 
@@ -157,6 +203,11 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                       <div className="space-y-1">
                         <div className="font-medium">{provider.name}</div>
                         <div className="text-sm text-muted-foreground">{provider.baseUrl}</div>
+                        {provider.apiKey && (
+                          <div className="text-xs text-muted-foreground">
+                            API Key: ••••••••
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center space-x-2">
                         <Switch
@@ -167,6 +218,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                           variant="ghost"
                           size="sm"
                           onClick={() => removeCustomProvider(provider.id)}
+                          className="text-destructive hover:text-destructive"
                         >
                           <Trash className="size-4" />
                         </Button>
