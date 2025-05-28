@@ -2,7 +2,6 @@
 "use client"
 
 import { UserProfile } from "@/app/types/user"
-import { createClient } from "@/lib/supabase/client"
 import {
   fetchUserProfile,
   signOutUser,

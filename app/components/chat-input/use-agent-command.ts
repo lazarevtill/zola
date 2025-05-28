@@ -4,7 +4,6 @@ import { Agent } from "@/app/types/agent"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import { useUser } from "@/lib/user-store/provider"
-import { debounce } from "@/lib/utils"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useRef, useState, useMemo } from "react"
 

@@ -8,6 +8,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/u
 import { APP_NAME } from "@/lib/config"
 import { createClient } from "@/lib/supabase/client"
 import { useUser } from "@/lib/user-store/provider"
+import Image from "next/image"
 import { useEffect, useState } from "react"
 
 type ProModelDialogProps = {
@@ -55,9 +56,11 @@ export function ProModelDialog({
   const renderContent = () => (
     <div className="flex max-h-[70vh] flex-col">
       <div className="relative">
-        <img
+        <Image
           src="/banner_ocean.jpg"
           alt={`calm paint generate by ${APP_NAME}`}
+          width={400}
+          height={128}
           className="h-32 w-full object-cover"
         />
       </div>
@@ -80,7 +83,7 @@ export function ProModelDialog({
           <div className="mt-5 flex justify-center gap-3">
             {submitted ? (
               <Badge className="bg-green-600 text-white">
-                Thanks! We'll keep you updated
+                Thanks! We&apos;ll keep you updated
               </Badge>
             ) : (
               <>

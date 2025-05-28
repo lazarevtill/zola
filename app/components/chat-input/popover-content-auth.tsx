@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { PopoverContent } from "@/components/ui/popover"
+import Image from "next/image"
 import React, { useState } from "react"
 import { signInWithGoogle } from "../../../lib/api"
 import { APP_NAME } from "../../../lib/config"
@@ -46,9 +47,11 @@ export function PopoverContentAuth() {
       side="top"
       align="start"
     >
-      <img
+      <Image
         src="/banner_forest.jpg"
         alt={`calm paint generate by ${APP_NAME}`}
+        width={300}
+        height={128}
         className="h-32 w-full object-cover"
       />
       {error && (
@@ -70,7 +73,7 @@ export function PopoverContentAuth() {
           onClick={handleSignInWithGoogle}
           disabled={isLoading}
         >
-          <img
+          <Image
             src="https://www.google.com/favicon.ico"
             alt="Google logo"
             width={20}

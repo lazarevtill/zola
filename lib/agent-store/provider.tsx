@@ -102,7 +102,7 @@ export const AgentProvider = ({ children, userId }: AgentProviderProps) => {
     }
 
     fetchUserAgents()
-  }, [fetchUserAgents])
+  }, [fetchUserAgents, userId])
 
   return (
     <>
