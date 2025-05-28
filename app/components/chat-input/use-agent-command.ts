@@ -66,13 +66,20 @@ export function useAgentCommand({
     [pathname, router, searchParams]
   )
 
-  const updateChatAgentDebounced = useMemo(
-    () => debounce((agent: Agent | null) => {
-      if (!user || !chatId) return
-      updateChatAgent(user.id, chatId, agent?.id ?? null, !user.anonymous)
-    }, 500),
-    [chatId, user, updateChatAgent]
-  )
+  const updateChatAgentDebounced = useMemo(() => {
+    let timeoutId: NodeJS.Timeout | null = null
+    
+    return (agent: Agent | null) => {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+      
+      timeoutId = setTimeout(() => {
+        if (!user || !chatId) return
+        updateChatAgent(user.id, chatId, agent?.id ?? null, !user.anonymous)
+      }, 500)
+    }
+  }, [chatId, user, updateChatAgent])
 
   const handleValueChange = useCallback(
     (newValue: string) => {

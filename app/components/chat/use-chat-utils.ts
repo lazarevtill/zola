@@ -2,6 +2,7 @@ import { toast } from "@/components/ui/toast"
 import { checkRateLimits } from "@/lib/api"
 import { REMAINING_QUERY_ALERT_THRESHOLD } from "@/lib/config"
 import { Message } from "@ai-sdk/react"
+import type { Chats } from "@/lib/chat-store/types"
 
 type UseChatUtilsProps = {
   isAuthenticated: boolean
@@ -18,7 +19,7 @@ type UseChatUtilsProps = {
     isAuthenticated?: boolean,
     systemPrompt?: string,
     agentId?: string
-  ) => Promise<{ id: string } | null>
+  ) => Promise<Chats | undefined>
   setHasDialogAuth: (value: boolean) => void
 }
 
