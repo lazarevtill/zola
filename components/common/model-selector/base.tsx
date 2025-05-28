@@ -24,7 +24,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { FREE_MODELS_IDS } from "@/lib/config"
-import { getAllModels } from "@/lib/models"
 import { ModelConfig } from "@/lib/models/types"
 import { PROVIDERS } from "@/lib/providers"
 import { cn } from "@/lib/utils"
@@ -364,7 +363,7 @@ export function ModelSelector({
                         "flex w-full items-center justify-between px-3 py-2",
                         selectedModelId === model.id && "bg-accent"
                       )}
-                      onSelect={(e) => {
+                      onSelect={(_e) => {
                         if (isPro) {
                           setSelectedProModel(model.id)
                           setIsProDialogOpen(true)

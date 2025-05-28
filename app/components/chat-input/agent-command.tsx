@@ -31,12 +31,12 @@ export function AgentCommand({
   curatedAgents,
   userAgents,
 }: AgentCommandProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const activeItemRef = useRef<HTMLLIElement>(null)
+
   if (!isSupabaseEnabled) {
     return null
   }
-
-  const containerRef = useRef<HTMLDivElement>(null)
-  const activeItemRef = useRef<HTMLLIElement>(null)
 
   // Filter agents based on search term
   const filteredAgents = searchTerm

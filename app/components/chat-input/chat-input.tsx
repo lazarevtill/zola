@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { useAgent } from "@/lib/agent-store/provider"
 import { getModelInfo } from "@/lib/models"
-import { isSupabaseEnabled } from "@/lib/supabase/config"
 import { ArrowUp, Stop, Warning } from "@phosphor-icons/react"
 import React, { useCallback, useEffect } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"

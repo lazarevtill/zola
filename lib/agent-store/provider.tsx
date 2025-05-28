@@ -7,7 +7,7 @@ import {
   fetchUserAgentsFromDb,
 } from "@/lib/agent-store/api"
 import { useChatSession } from "@/lib/chat-store/session/provider"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import {
   createContext,
   Suspense,

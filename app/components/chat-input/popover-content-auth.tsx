@@ -9,12 +9,12 @@ import { createClient } from "../../../lib/supabase/client"
 import { isSupabaseEnabled } from "../../../lib/supabase/config"
 
 export function PopoverContentAuth() {
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
   if (!isSupabaseEnabled) {
     return null
   }
-
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const handleSignInWithGoogle = async () => {
     const supabase = createClient()
@@ -33,9 +33,9 @@ export function PopoverContentAuth() {
       if (data?.url) {
         window.location.href = data.url
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error signing in with Google:", err)
-      setError(err.message || "An unexpected error occurred. Please try again.")
+      setError((err as Error).message || "An unexpected error occurred. Please try again.")
     } finally {
       setIsLoading(false)
     }

@@ -30,7 +30,6 @@ export function UserProvider({
 }) {
   const [user, setUser] = useState<UserProfile | null>(initialUser)
   const [isLoading, setIsLoading] = useState(false)
-  const supabase = createClient()
 
   const refreshUser = async () => {
     if (!user?.id) return
