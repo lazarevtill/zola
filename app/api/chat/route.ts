@@ -1,7 +1,7 @@
 import { loadAgent } from "@/lib/agents/load-agent"
 import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { loadMCPToolsFromURL } from "@/lib/mcp/load-mcp-from-url"
-import { MODELS } from "@/lib/models"
+import { getAllModels } from "@/lib/models"
 import { Attachment } from "@ai-sdk/ui-utils"
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import {
@@ -74,7 +74,8 @@ export async function POST(req: Request) {
       agentConfig = await loadAgent(agentId)
     }
 
-    const modelConfig = MODELS.find((m) => m.id === model)
+    const allModels = await getAllModels()
+    const modelConfig = allModels.find((m) => m.id === model)
 
     if (!modelConfig || !modelConfig.apiSdk) {
       throw new Error(`Model ${model} not found`)
