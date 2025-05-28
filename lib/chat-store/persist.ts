@@ -11,7 +11,8 @@ import {
 
 let dbReady = false
 let dbInitPromise: Promise<void> | null = null
-let stores: Record<string, any> = {}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const stores: Record<string, any> = {}
 
 const isClient = typeof window !== "undefined"
 const DB_NAME = "zola-db"

@@ -248,7 +248,7 @@ function SingleToolCard({
               if (!didCancel) {
                 setParsedResult(parsed)
               }
-            } catch (_e) {
+            } catch {
               // If not valid JSON, just use the text as is
               if (!didCancel) {
                 setParsedResult(textContent.text)
